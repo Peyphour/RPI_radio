@@ -208,7 +208,7 @@ public class ListenGpio {
     public void readFile() {
         Properties prop = new Properties();
         try {
-            InputStream input = new FileInputStream("radios.properties");
+            InputStream input = new FileInputStream("/home/mopidy/radios.properties");
             prop.load(input);
             this.stationsUri = (String[]) Arrays.asList(
                     prop.getProperty("station1"),
