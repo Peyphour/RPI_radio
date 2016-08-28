@@ -22,11 +22,11 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="true" />
-        <module name="Gpio" />
+        <module name="gpio" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="Gpio" target="1.5" />
+      <module name="gpio" target="1.5" />
     </bytecodeTargetLevel>
   </component>
 </project>

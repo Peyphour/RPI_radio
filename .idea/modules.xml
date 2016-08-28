@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/Gpio.iml" filepath="$PROJECT_DIR$/Gpio.iml" />
+      <module fileurl="file://$PROJECT_DIR$/gpio.iml" filepath="$PROJECT_DIR$/gpio.iml" />
     </modules>
   </component>
 </project>

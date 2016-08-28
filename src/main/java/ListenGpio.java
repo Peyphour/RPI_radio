@@ -5,9 +5,7 @@ import okhttp3.*;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.util.Arrays;
 import java.util.Properties;
 
@@ -68,6 +66,41 @@ public class ListenGpio {
         });
 
         buildRequestBody();
+        checkLastStation();
+    }
+
+    private void checkLastStation() {
+        File f = new File("/home/mopidy/last_station");
+        byte[] content = new byte[10];
+        if(f.exists()) {
+            try {
+                FileInputStream fis = new FileInputStream(f);
+                fis.read(content);
+                int index = Integer.valueOf(new String(content).trim());
+                sendRequest(stationsUri[index]);
+                fis.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void saveLastStation(String station) {
+        int index = 0;
+        for(int i = 0; i < stationsUri.length; i++) {
+            if(stationsUri[i].equals(station)) {
+                index = i;
+                break;
+            }
+        }
+        File f = new File("/home/mopidy/last_station");
+        try {
+            FileOutputStream fos = new FileOutputStream(f, false);
+            fos.write(String.valueOf(index).getBytes());
+            fos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void buildRequestBody() {
@@ -99,6 +132,7 @@ public class ListenGpio {
 
     private void sendRequest(String content) {
 
+        this.saveLastStation(content);
 
         OkHttpClient client = new OkHttpClient();
 
