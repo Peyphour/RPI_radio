@@ -5,7 +5,9 @@ import okhttp3.*;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
-import java.io.*;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Properties;
 
@@ -14,10 +16,10 @@ public class ListenGpio {
     // create gpio controller
     final GpioController gpio = GpioFactory.getInstance();
 
-    final GpioPinDigitalInput playButton = gpio.provisionDigitalInputPin(RaspiPin.GPIO_00, PinPullResistance.PULL_DOWN);
-    final GpioPinDigitalInput pauseButton = gpio.provisionDigitalInputPin(RaspiPin.GPIO_01, PinPullResistance.PULL_DOWN);
-    final GpioPinDigitalInput nextButton = gpio.provisionDigitalInputPin(RaspiPin.GPIO_02, PinPullResistance.PULL_DOWN);
-    final GpioPinDigitalInput previousButton = gpio.provisionDigitalInputPin(RaspiPin.GPIO_03, PinPullResistance.PULL_DOWN);
+    final GpioPinDigitalInput station1 = gpio.provisionDigitalInputPin(RaspiPin.GPIO_00, PinPullResistance.PULL_DOWN);
+    final GpioPinDigitalInput station2 = gpio.provisionDigitalInputPin(RaspiPin.GPIO_01, PinPullResistance.PULL_DOWN);
+    final GpioPinDigitalInput station3 = gpio.provisionDigitalInputPin(RaspiPin.GPIO_02, PinPullResistance.PULL_DOWN);
+    final GpioPinDigitalInput station4 = gpio.provisionDigitalInputPin(RaspiPin.GPIO_03, PinPullResistance.PULL_DOWN);
 
     private int requestId = 1;
 
@@ -28,39 +30,39 @@ public class ListenGpio {
 
     public void setup() {
 
-        playButton.setShutdownOptions(true);
-        pauseButton.setShutdownOptions(true);
-        nextButton.setShutdownOptions(true);
-        previousButton.setShutdownOptions(true);
+        station1.setShutdownOptions(true);
+        station2.setShutdownOptions(true);
+        station3.setShutdownOptions(true);
+        station4.setShutdownOptions(true);
 
-        playButton.addListener(new GpioPinListenerDigital() {
+        station1.addListener(new GpioPinListenerDigital() {
             public void handleGpioPinDigitalStateChangeEvent(GpioPinDigitalStateChangeEvent event) {
                 if (event.getState() == PinState.HIGH) {
-                    sendRequest(stationsUri[0]);
+                    changeStation(stationsUri[0]);
                 }
             }
         });
 
-        pauseButton.addListener(new GpioPinListenerDigital() {
+        station2.addListener(new GpioPinListenerDigital() {
             public void handleGpioPinDigitalStateChangeEvent(GpioPinDigitalStateChangeEvent event) {
                 if (event.getState() == PinState.HIGH) {
-                    sendRequest(stationsUri[1]);
+                    changeStation(stationsUri[1]);
                 }
             }
         });
 
-        nextButton.addListener(new GpioPinListenerDigital() {
+        station3.addListener(new GpioPinListenerDigital() {
             public void handleGpioPinDigitalStateChangeEvent(GpioPinDigitalStateChangeEvent event) {
                 if (event.getState() == PinState.HIGH) {
-                    sendRequest(stationsUri[2]);
+                    changeStation(stationsUri[2]);
                 }
             }
         });
 
-        previousButton.addListener(new GpioPinListenerDigital() {
+        station4.addListener(new GpioPinListenerDigital() {
             public void handleGpioPinDigitalStateChangeEvent(GpioPinDigitalStateChangeEvent event) {
                 if (event.getState() == PinState.HIGH) {
-                    sendRequest(stationsUri[3]);
+                    changeStation(stationsUri[3]);
                 }
             }
         });
@@ -70,37 +72,14 @@ public class ListenGpio {
     }
 
     private void checkLastStation() {
-        File f = new File("/home/mopidy/last_station");
-        byte[] content = new byte[10];
-        if(f.exists()) {
-            try {
-                FileInputStream fis = new FileInputStream(f);
-                fis.read(content);
-                int index = Integer.valueOf(new String(content).trim());
-                sendRequest(stationsUri[index]);
-                fis.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private void saveLastStation(String station) {
-        int index = 0;
-        for(int i = 0; i < stationsUri.length; i++) {
-            if(stationsUri[i].equals(station)) {
-                index = i;
-                break;
-            }
-        }
-        File f = new File("/home/mopidy/last_station");
-        try {
-            FileOutputStream fos = new FileOutputStream(f, false);
-            fos.write(String.valueOf(index).getBytes());
-            fos.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        if(station1.isHigh())
+            changeStation(stationsUri[0]);
+        if(station2.isHigh())
+            changeStation(stationsUri[1]);
+        if(station3.isHigh())
+            changeStation(stationsUri[2]);
+        if(station4.isHigh())
+            changeStation(stationsUri[3]);
     }
 
     private void buildRequestBody() {
@@ -131,24 +110,11 @@ public class ListenGpio {
     }
 
     private void sendRequest(String content) {
-
-        this.saveLastStation(content);
-
         OkHttpClient client = new OkHttpClient();
 
         MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-        JSONObject currentRequest;
-
-        // Sequence is :
-        // stopClear, stop, clear, add, play
-
-        currentRequest = (JSONObject) stopClearBody.clone();
-        currentRequest.put("id", requestId);
-
-        System.out.println(currentRequest.toJSONString());
-
-        RequestBody body = RequestBody.create(JSON, currentRequest.toJSONString());
+        RequestBody body = RequestBody.create(JSON, content);
         Request request = new Request.Builder()
                 .url("http://localhost:6680/mopidy/rpc")
                 .post(body)
@@ -162,40 +128,29 @@ public class ListenGpio {
         }
 
         this.requestId++;
+    }
+
+    private void changeStation(String station) {
+
+        JSONObject currentRequest;
+
+        // Sequence is :
+        // stopClear, stop, clear, add, play
+
+        currentRequest = (JSONObject) stopClearBody.clone();
+        currentRequest.put("id", requestId);
+
+        this.sendRequest(currentRequest.toJSONString());
 
         currentRequest = (JSONObject) stopBody.clone();
         currentRequest.put("id", requestId);
 
-        body = RequestBody.create(JSON, currentRequest.toJSONString());
-        request = new Request.Builder()
-                .url("http://localhost:6680/mopidy/rpc")
-                .post(body)
-                .build();
-        try {
-            response = client.newCall(request).execute();
-            System.out.println(response.body().string());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        this.requestId++;
+        this.sendRequest(currentRequest.toJSONString());
 
         currentRequest = (JSONObject) clearBody.clone();
         currentRequest.put("id", requestId);
 
-        body = RequestBody.create(JSON, currentRequest.toJSONString());
-        request = new Request.Builder()
-                .url("http://localhost:6680/mopidy/rpc")
-                .post(body)
-                .build();
-        try {
-            response = client.newCall(request).execute();
-            System.out.println(response.body().string());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        this.requestId++;
+        this.sendRequest(currentRequest.toJSONString());
 
         currentRequest = (JSONObject) addBody.clone();
         currentRequest.put("id", requestId);
@@ -203,40 +158,16 @@ public class ListenGpio {
         params = new JSONArray();
         params.add(null);
         params.add(null);
-        params.add(content);
+        params.add(station);
 
         currentRequest.put("params", params);
 
-        System.out.println(currentRequest.toJSONString());
-
-        body = RequestBody.create(JSON, currentRequest.toJSONString());
-        request = new Request.Builder()
-                .url("http://localhost:6680/mopidy/rpc")
-                .post(body)
-                .build();
-        try {
-            response = client.newCall(request).execute();
-            System.out.println(response.body().string());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        this.requestId++;
+        this.sendRequest(currentRequest.toJSONString());
 
         currentRequest = (JSONObject) playBody.clone();
         currentRequest.put("id", requestId);
 
-        body = RequestBody.create(JSON, currentRequest.toJSONString());
-        request = new Request.Builder()
-                .url("http://localhost:6680/mopidy/rpc")
-                .post(body)
-                .build();
-        try {
-            response = client.newCall(request).execute();
-            System.out.println(response.body().string());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        this.sendRequest(currentRequest.toJSONString());
     }
 
     public void readFile() {
@@ -263,7 +194,7 @@ public class ListenGpio {
         gpio.readFile();
         gpio.setup();
 
-        while(true) {
+        while (true) {
             Thread.sleep(500);
         }
     }
